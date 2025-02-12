@@ -1,92 +1,65 @@
-import openai
+# main.py
 import json
-
-# Sett din OpenAI API-nøkkel her
-openai.api_key = "SK-DIN-API-NØKKEL-HER"
-
-def extract_financials_from_report(report_text: str, presentation_text: str) -> dict:
-    """
-    Sender kvartalsrapport-tekst til en LLM for å hente ut nøkkeltall.
-    Returnerer et JSON-lignende Python-dikt.
-    """
-
-    # Bygg prompten
-    prompt = f"""
-        Du får en kvartalsrapport, og din oppgave er å identifisere spesifikke økonomiske nøkkeltall og presentere dem som et JSON-objekt med følgende struktur:
-
-        {{
-        "revenue": REVENUE,  # Totale inntekter (MSEK)
-        "operating_income": OPERATING_INCOME,  # Driftsresultat (MSEK)
-        "profit_before_tax": PROFIT_BEFORE_TAX,  # Resultat før skatt (MSEK)
-        "profit_after_tax": PROFIT_AFTER_TAX,  # Resultat etter skatt (MSEK)
-        "ebitda": EBITDA,  # EBITDA (MSEK)
-        "eps": EPS,  # Fortjeneste per aksje (SEK)
-        "backlog": BACKLOG,  # Hvor stor andel av fremtidig omsetning som er sikret (MSEK)
-        "fremtid1år": POTENSIALE_1ÅR,  # Forventet vekstpotensiale om 1 år (skala 1-5)
-        "fremtid2år": POTENSIALE_2ÅR,  # Forventet vekstpotensiale om 2 år (skala 1-5)
-        "fremtid3år": POTENSIALE_3ÅR  # Forventet vekstpotensiale om 3 år (skala 1-5)
-        }}
-
-        ### Krav:
-        - Returner **kun** JSON-objektet, uten ekstra tekst, forklaringer eller symboler.
-        - Hvis et nøkkeltall ikke finnes i teksten, sett verdien til `null`.
-        - Bruk **kun numeriske verdier** (flyttall).
-        - Bruk **punktum** (`.`) som desimaltegn.
-
-        Her er teksten som skal analyseres:
-        \"\"\"{report_text}\"\"\"
-        \"\"\"{presentation_text}\"\"\"
-    """
-
-    
-    # Kall OpenAI ChatCompletion (GPT 3.5 eller 4). 
-    # Velg den modellen du har tilgang til (for eksempel "gpt-3.5-turbo").
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "Du er en dyktig finansanalytiker som returnerer data i JSON-format."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.0  # Sett til 0 for minst mulig 'kreativ' respons
-    )
-
-    # Selve svaret fra API-et
-    raw_response = response["choices"][0]["message"]["content"].strip()
-    
-    # Forsøk å parse JSON
-    try:
-        data = json.loads(raw_response)
-    except json.JSONDecodeError:
-        # Hvis det skulle feile, kan vi for eksempel returnere tom dict
-        data = {}
-    
-    return data
-
+from openai_model import OpenAIModel
+from deepseek_model import DeepSeekModel
 
 def main():
-    # Eksempel på en tekst vi vil analysere
-    quarterly_report_text = """
-Rapport for Q4 2024:
-- Omsetningen i kvartalet var 14,5 millioner kroner, en økning på 5% fra i fjor.
-- Driftsresultatet ble 2 millioner kroner.
-- Resultat før skatt endte på 1,5 millioner kroner.
-- Selskapet opplyser at EBITDA var 2,5 millioner kroner.
-- EPS var 0,12 kroner per aksje.
-    """
-    quarterly_presentation_text = """
-Bla bla bla
+    # Felles instruksjoner (systemprompt) - kun et eksempel
+    instructions = """
+    Du er en dyktig finansanalytiker som returnerer data i JSON-format. 
+    Pass på å holde deg til JSON-struktur, ingen ekstra tegn.
     """
 
-    # 1. Kall funksjonen som henter ut nøkkeltall via OpenAI
-    extracted_data = extract_financials_from_report(quarterly_report_text, quarterly_presentation_text)
+    # Eksempeltekst (brukerprompt / "text" som LLM-en skal analysere)
+    # Du kan lage en større prompt her om du vil, 
+    # men ofte er det lurt å sende inn kun det som er relevant å analysere.
+    user_text = """
+    Identifiser følgende økonomiske nøkkeltall i denne kvartalsrapporten og returner dem som JSON:
+    - Omsetning (revenue)
+    - Driftsresultat (operating_income)
+    - Resultat før skatt (profit_before_tax)
+    - ...
+    
+    Rapport (Q4 2024):
+    - Omsetning: 14,5 millioner kroner.
+    - Driftsresultat: 2 millioner kroner.
+    - Resultat før skatt: 1,5 millioner kroner.
+    - EBITDA: 2,5 millioner kroner.
+    - EPS: 0,12 kroner per aksje.
+    """
 
-    # 2. Skriv resultatet til en JSON-fil
-    output_filename = "extracted_data.json"
-    with open(output_filename, "w", encoding="utf-8") as f:
-        json.dump(extracted_data, f, ensure_ascii=False, indent=2)
+    # 1) Bruk OpenAI-implementasjonen
+    openai_model = OpenAIModel(
+        instructions=instructions,
+        api_key="SK-DIN-API-NØKKEL-HER",
+        model_name="gpt-3.5-turbo"
+    )
 
-    print(f"Nøkkeltall lagret i '{output_filename}':")
-    print(json.dumps(extracted_data, indent=2, ensure_ascii=False))
+    openai_raw_response = openai_model.run(user_text)
+    print("OpenAI Rå-respons:\n", openai_raw_response)
+
+    # Parse JSON hvis du ønsker struktur
+    try:
+        openai_data = json.loads(openai_raw_response)
+    except json.JSONDecodeError:
+        openai_data = {}
+    print("OpenAI JSON:\n", json.dumps(openai_data, indent=2, ensure_ascii=False))
+
+    # 2) Bruk DeepSeek-implementasjonen
+    deepseek_model = DeepSeekModel(
+        instructions=instructions,
+        api_key="DIN-DEEPSEEK-API-NØKKEL-HER",
+        model_name="deepseek-default"
+    )
+
+    deepseek_raw_response = deepseek_model.run(user_text)
+    print("\nDeepSeek Rå-respons:\n", deepseek_raw_response)
+
+    try:
+        deepseek_data = json.loads(deepseek_raw_response)
+    except json.JSONDecodeError:
+        deepseek_data = {}
+    print("DeepSeek JSON:\n", json.dumps(deepseek_data, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

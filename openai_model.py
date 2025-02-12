@@ -3,13 +3,13 @@ import openai
 from llm_model import LLMModel
 
 class OpenAIModel(LLMModel):
-    def __init__(self, instructions: str, api_key: str = "SK-DIN-API-NØKKEL-HER", model_name: str = "gpt-3.5-turbo"):
+    def __init__(self, instructions: str, model_name: str = "gpt-3.5-turbo"):
         """
         Eksempel: Skjuler OpenAI-spesifikt oppsett (API-nøkkel, modellnavn, etc.).
         'instructions' tas med og sendes videre til super-klassen.
         """
         super().__init__(instructions)  # Lagrer instructions i self.instructions
-        openai.api_key = api_key
+        openai.api_key = "SK-DIN-API-NØKKEL-HER" #Bør ligge i keyvault eller liknende
         self.model_name = model_name
 
     def run(self, text: str) -> str:

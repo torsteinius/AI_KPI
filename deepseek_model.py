@@ -2,13 +2,13 @@
 from llm_model import LLMModel
 
 class DeepSeekModel(LLMModel):
-    def __init__(self, instructions: str, api_key: str = "DIN-DEEPSEEK-API-NØKKEL-HER", model_name: str = "deepseek-default"):
+    def __init__(self, instructions: str, model_name: str = "deepseek-default"):
         """
         Fiktivt oppsett for DeepSeek (API-nøkkel, modellnavn, etc.).
         Sender instructions til super-klassen.
         """
         super().__init__(instructions)
-        self.api_key = api_key
+        self.api_key = "DIN-DEEPSEEK-API-NØKKEL-HER" #Bør ligge i keyvault eller liknende
         self.model_name = model_name
         # Evt. opprett en DeepSeek-klient her.
 

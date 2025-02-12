@@ -1,2 +1,3 @@
-secrets.txt
+*.txt
+venv
 

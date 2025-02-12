@@ -48,7 +48,7 @@ def main():
     #    (API-nøkkelen kan du legge inn her eller håndtere via miljøvariabler)
     openai_model = OpenAIModel(
         instructions=instructions,
-        model_name="gpt-3.5-turbo"
+        model_name="gpt-4o-mini"  
     )
 
     # 4) Bygg en user-prompt / brukertekst som forteller hva du ønsker.
@@ -120,6 +120,10 @@ def main():
     # 7) Skriv ut (eller lagre) resultatet
     print("Resultat fra OpenAI (JSON):")
     print(json.dumps(data, indent=2, ensure_ascii=False))
+
+    # 8) Lagre resultatet til en fil
+    with open("resultat.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 if __name__ == "__main__":
     main()

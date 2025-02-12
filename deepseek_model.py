@@ -4,17 +4,18 @@ import json
 from llm_model import LLMModel
 
 class DeepSeekModel(LLMModel):
-    def __init__(self, instructions: str, model_name: str = "deepseek-default"):
+    def __init__(self, instructions: str, model_name: str = "deepseek-chat"):
         """
-        Oppsett for DeepSeek (API-nøkkel, modellnavn, etc.).
-        Sender instructions til super-klassen.
-
-        API-nøkkel leses fra `secrets.txt` med formatet: 
-        DeepSeek_Key=DIN_API_NØKKEL
+        Oppsett for DeepSeek API, kompatibelt med OpenAI API.
+        - Henter API-nøkkel fra `secrets.txt` (DeepSeek_Key=API_NØKKEL).
+        - Sender systeminstruksjoner via OpenAI-kompatibel meldingsstruktur.
+        
+        :param instructions: Systemprompt (rolle for AI-en)
+        :param model_name: Modellnavn (f.eks. "deepseek-chat", "deepseek-reasoner")
         """
         super().__init__(instructions)
-
-        # Standardiser API-nøkkel
+        
+        # Hent API-nøkkel fra secrets.txt
         self.api_key = None
         try:
             with open("secrets.txt", "r", encoding="utf-8") as f:
@@ -29,7 +30,7 @@ class DeepSeekModel(LLMModel):
             raise ValueError("DeepSeek API-nøkkel ikke funnet i `secrets.txt`. Sørg for at den inneholder `DeepSeek_Key=DIN_API_NØKKEL`.")
 
         self.model_name = model_name
-        self.api_url = "https://api.deepseek.com/generate"  # Eksempel-URL, endre ved behov.
+        self.api_url = "https://api.deepseek.com/v1/chat/completions"  # OpenAI-kompatibel endpoint
 
     def run(self, text: str) -> str:
         """
@@ -40,8 +41,11 @@ class DeepSeekModel(LLMModel):
         """
         payload = {
             "model": self.model_name,
-            "prompt": text,
-            "instructions": self.instructions
+            "messages": [
+                {"role": "system", "content": self.instructions},  # Instruksjoner til AI-en
+                {"role": "user", "content": text}  # Brukerens melding
+            ],
+            "stream": False  # Kan settes til True for strømming
         }
 
         headers = {

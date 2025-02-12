@@ -131,6 +131,12 @@ def run_analysis_for_company(company: str) -> None:
         **Her er teksten som skal analyseres**:
         {all_pdf_text}
         """
+    # 4) Lagre user-prompt til fil for inspeksjon under katalogen "prompt"
+    if not os.path.exists("prompt"):
+        os.makedirs("prompt")  # Opprett katalogen hvis den ikke finnes 
+
+    with open(os.path.join("prompt", f"{company}_prompt.txt"), "w", encoding="utf-8") as f:
+        f.write(user_text)
 
     # 5) Kjør modellen med user-teksten.
     raw_response = openai_model.run(user_text)
@@ -156,4 +162,4 @@ def run_analysis_for_company(company: str) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 if __name__ == "__main__":
-    run_analysis_for_company("sdiptech")
+    run_analysis_for_company("Reach-Subsea")

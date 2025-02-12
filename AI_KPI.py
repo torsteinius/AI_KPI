@@ -55,13 +55,12 @@ def run_analysis_for_company(company: str) -> None:
         model_name="gpt-4o-mini"  # Just an example
     )
 
-    # 4) Bygg user-prompt.
+    # 4) Bygg user-prompt med utvidede KPI-felter:
     user_text = f"""
         Du får nå innholdet fra én eller flere PDF-filer (for eksempel {company}-rapporter),
-        samlet nedenfor:
-        {all_pdf_text}
+        samlet nedenfor.
 
-        Vennligst analyser denne teksten og returner et JSON-objekt med disse nøkler:
+        Vennligst analyser denne teksten og returner et JSON-objekt med følgende nøkler:
 
         {{
             "company": ...,
@@ -69,11 +68,25 @@ def run_analysis_for_company(company: str) -> None:
             "quarter": ...,
 
             "revenue": ...,
+            "gross_profit": ...,
+            "gross_margin": ...,
             "operating_income": ...,
+            "operating_margin": ...,
             "profit_before_tax": ...,
             "profit_after_tax": ...,
+            "net_income": ...,
             "ebitda": ...,
+            "ebitda_margin": ...,
             "eps": ...,
+
+            "operating_cash_flow": ...,
+            "free_cash_flow": ...,
+            "debt_to_equity": ...,
+            "roe": ...,
+            "roa": ...,
+            "dividend_yield": ...,
+
+            "guidance": ...,
             "backlog": ...,
             "fremtid1år": ...,
             "fremtid2år": ...,
@@ -85,25 +98,37 @@ def run_analysis_for_company(company: str) -> None:
         - **year**: Hvilket år tallene gjelder.
         - **quarter**: Hvilket kvartal tallene gjelder (f.eks. "Q4").
 
-        - **revenue**: Totale inntekter (i MSEK). 
-        - **operating_income**: Driftsresultat (i MSEK).
-        - **profit_before_tax**: Resultat før skatt (i MSEK).
-        - **profit_after_tax**: Resultat etter skatt (i MSEK).
-        - **ebitda**: EBITDA (i MSEK).
-        - **eps**: Fortjeneste per aksje (i SEK).
-        - **backlog**: Hvor stor andel av fremtidig omsetning som allerede er sikret (i MSEK).
-        - **fremtid1år**: Forventet vekstpotensiale om 1 år, skala 1–5 (5 = høyest), `null` hvis ukjent.
-        - **fremtid2år**: Forventet vekstpotensiale om 2 år, skala 1–5, `null` hvis ukjent.
-        - **fremtid3år**: Forventet vekstpotensiale om 3 år, skala 1–5, `null` hvis ukjent.
+        - **revenue**: Totale inntekter (f.eks. i MSEK).
+        - **gross_profit**: Bruttofortjeneste (MSEK).
+        - **gross_margin**: Bruttomargin i prosent (f.eks. 35.2 for 35,2%).
+        - **operating_income**: Driftsresultat (MSEK).
+        - **operating_margin**: Driftsmargin i prosent (f.eks. 12.5 for 12,5%).
+        - **profit_before_tax**: Resultat før skatt (MSEK).
+        - **profit_after_tax**: Resultat etter skatt (MSEK).
+        - **net_income**: Kan være samme som "profit_after_tax" hvis PDF-en omtaler det slik.
+        - **ebitda**: EBITDA (MSEK).
+        - **ebitda_margin**: EBITDA-margin i prosent.
+        - **eps**: Fortjeneste per aksje (SEK).
+
+        - **operating_cash_flow**: Kontantstrøm fra drift (MSEK).
+        - **free_cash_flow**: Fri kontantstrøm (MSEK).
+        - **debt_to_equity**: Gjeldsgrad (numerisk verdi, f.eks. 1.2).
+        - **roe**: Return on Equity, i prosent (f.eks. 15.3).
+        - **roa**: Return on Assets, i prosent (f.eks. 8.1).
+        - **dividend_yield**: Utbytteavkastning i prosent (f.eks. 4.5).
+
+        - **guidance**: Tekstlig oppsummering av selskapets framtidige utsikter (hvis tilgjengelig).
+        - **backlog**: Hvor stor ordre-/kontraktsreserve selskapet har (MSEK), om tilgjengelig.
+        - **fremtid1år**, **fremtid2år**, **fremtid3år**: Forventet vekstpotensial (1–5), eller null hvis ukjent.
 
         ### Krav:
         1. Returner **kun** JSON-objektet, uten ekstra forklaringer eller symboler før/etter.
         2. Hvis et nøkkeltall ikke finnes i teksten, sett verdien til `null`.
-        3. Bruk **kun numeriske verdier** (flyt- eller heltall) for tallfeltene.
+        3. Bruk **kun numeriske verdier** (flyt- eller heltall) for tallfeltene, unntatt 'guidance' som kan være tekst.
         4. Bruk punktum (".") som desimaltegn (ikke komma).
         5. Hvis du ikke kan finne 'company', 'year' eller 'quarter' i teksten, sett dem til null.
 
-        **Her er teksten som skal analyseres** (PDF-innhold etc.):
+        **Her er teksten som skal analyseres**:
         {all_pdf_text}
         """
 

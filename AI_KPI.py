@@ -48,14 +48,12 @@ def run_analysis_for_company(company: str) -> None:
 
     # 3) Opprett OpenAI-modellen.
     llm_model = OpenAIModel(
-        instructions=instructions+all_pdf_text,
+        instructions=instructions,
         model_name="gpt-4o-mini"  
     )
 
     # 4) Bygg user-prompt
-    user_text = f"""
-    **Her er teksten som skal analyseres**:
-    """
+    user_text = all_pdf_text
 
     # 5) Lagre user-prompt til fil
     os.makedirs("prompt", exist_ok=True)

@@ -1,5 +1,3 @@
 *.txt
 venv
-
-
 secrets.txt

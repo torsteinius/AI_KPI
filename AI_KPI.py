@@ -1,6 +1,7 @@
 import os
 import json
 import PyPDF2
+from datetime import datetime
 from openai_model import OpenAIModel
 
 def extract_text_from_pdf(pdf_file: str) -> str:
@@ -17,7 +18,7 @@ def extract_text_from_pdf(pdf_file: str) -> str:
                 text += page_text + "\n"
     return text
 
-def read_and_combine_pdfs(pdf_dir: str, prefix: str = "sdiptech") -> str:
+def read_and_combine_pdfs(pdf_dir: str, prefix: str) -> str:
     """
     Går gjennom alle PDF-filer i pdf_dir som starter med `prefix`,
     henter ut tekst, og setter dem sammen til én streng.
@@ -31,36 +32,43 @@ def read_and_combine_pdfs(pdf_dir: str, prefix: str = "sdiptech") -> str:
             combined_text += pdf_text
     return combined_text
 
-def main():
-    # 1) Definer instruksjoner (systemprompt) 
-    #    Dette sendes til konstruktøren i OpenAIModel.
+def run_analysis_for_company(company: str) -> None:
+    """
+    Kjører analyse for et gitt selskap. 
+    Resultatet lagres i en fil: {company}_{YYYYMMDD}.json.
+    Selskap, år, kvartal (og de øvrige feltene) hentes automatisk av LLM fra PDF-innholdet.
+    """
+
+    # 1) Definer instruksjoner (systemprompt).
     instructions = """
     Du er en dyktig finansanalytiker som returnerer data i JSON-format.
     Pass på å holde deg til JSON-struktur, uten ekstra tegn eller forklaring.
     """
 
-    # 2) Les og sammenstill innholdet fra PDF-filer i katalogen "./pdf"
-    #    som starter med "sdiptech"
+    # 2) Les PDF-filer i katalogen 'pdf' som starter med selskapets navn.
     pdf_dir = "pdf"
-    all_pdf_text = read_and_combine_pdfs(pdf_dir, prefix="sdiptech")
+    all_pdf_text = read_and_combine_pdfs(pdf_dir, prefix=company)
 
-    # 3) Opprett OpenAI-modellen (GPT 3.5)
-    #    (API-nøkkelen kan du legge inn her eller håndtere via miljøvariabler)
+    # 3) Opprett OpenAI-modellen.
     openai_model = OpenAIModel(
         instructions=instructions,
-        model_name="gpt-4o-mini"  
+        model_name="gpt-4o-mini"  # Sett til riktig modellnavn / ID
     )
 
-    # 4) Bygg en user-prompt / brukertekst som forteller hva du ønsker.
-    #    Her kan du legge inn mer spesifikk instruks om hvilke nøkler du vil ha i JSON.
-
+    # 4) Bygg user-prompt: vi ber spesifikt om at LLM returnerer feltene
+    #    "company", "year", "quarter" samt de ulike nøkkeltallene.
     user_text = f"""
-        Du får nå innholdet fra én eller flere PDF-filer (for eksempel Sdiptech-rapporter), samlet nedenfor:
+        Du får nå innholdet fra én eller flere PDF-filer (for eksempel {company}-rapporter),
+        samlet nedenfor:
         {all_pdf_text}
 
-        Vennligst analyser denne teksten og returner et JSON-objekt med følgende nøkler og tilhørende verdier:
+        Vennligst analyser denne teksten og returner et JSON-objekt med disse nøkler:
 
         {{
+            "company": ...,
+            "year": ...,
+            "quarter": ...,
+
             "revenue": ...,
             "operating_income": ...,
             "profit_before_tax": ...,
@@ -74,60 +82,53 @@ def main():
         }}
 
         ### Slik skal feltverdiene tolkes:
-
-        - **revenue**: Totale inntekter (i MSEK). 
-        - Hvis tallet kun finnes i andre valuta, konverter så godt det lar seg gjøre, eller sett `null` hvis usikkert.
+        - **company**: Selskapets navn (slik det fremgår av PDF-en, eller {company} om usikkert).
+        - **year**: Hvilket år tallene gjelder for. 
+        - **quarter**: Hvilket kvartal tallene gjelder for (f.eks. "Q4"). 
+        
+        - **revenue**: Totale inntekter (i MSEK). Hvis tallet kun finnes i annen valuta, 
+                      konverter så godt det lar seg gjøre, eller sett `null` hvis usikkert.
 
         - **operating_income**: Driftsresultat (i MSEK).
-
         - **profit_before_tax**: Resultat før skatt (i MSEK).
-
         - **profit_after_tax**: Resultat etter skatt (i MSEK).
-
         - **ebitda**: EBITDA (i MSEK).
-
         - **eps**: Fortjeneste per aksje (i SEK).
-
         - **backlog**: Hvor stor andel av fremtidig omsetning som allerede er sikret (i MSEK).
-
-        - **fremtid1år**: Forventet vekstpotensiale om 1 år, på en skala fra 1 til 5 (hvor 5 er høyest). 
-        - Hvis dette ikke kan vurderes ut fra teksten, bruk `null`.
-
+        - **fremtid1år**: Forventet vekstpotensiale om 1 år, skala 1–5 (5 = høyest), `null` hvis ukjent.
         - **fremtid2år**: Forventet vekstpotensiale om 2 år, skala 1–5, `null` hvis ukjent.
-
         - **fremtid3år**: Forventet vekstpotensiale om 3 år, skala 1–5, `null` hvis ukjent.
 
         ### Krav:
-        1. Returner **kun** JSON-objektet, uten ekstra forklaringer, symboler eller tekst før/etter.  
-        2. Hvis et nøkkeltall ikke finnes i teksten, sett verdien til `null`.  
-        3. Bruk **kun numeriske verdier** (flyt- eller heltall).  
-        4. Bruk punktum (".") som desimaltegn (ikke komma).  
+        1. Returner **kun** JSON-objektet, uten ekstra forklaringer eller symboler før/etter.
+        2. Hvis et nøkkeltall ikke finnes i teksten, sett verdien til `null`.
+        3. Bruk **kun numeriske verdier** (flyt- eller heltall) for tallfeltene.
+        4. Bruk punktum (".") som desimaltegn (ikke komma).
+        5. Hvis du ikke kan finne 'company', 'year' eller 'quarter' i teksten, sett dem til null.
 
         **Her er teksten som skal analyseres** (PDF-innhold etc.):
         {all_pdf_text}
         """
 
-
-    # 5) Kjør modellen med user-teksten
+    # 5) Kjør modellen med user-teksten.
     raw_response = openai_model.run(user_text)
 
-    # 6) Prøv å parse svaret til et dict (JSON)
+    # 6) Prøv å parse svaret til et dict (JSON).
     try:
         data = json.loads(raw_response)
     except json.JSONDecodeError:
         data = {}
 
-    # 7) Skriv ut (eller lagre) resultatet
+    # 7) Velg filnavn som inkluderer company og dagens dato.
+    date_str = datetime.now().strftime("%Y%m%d")
+    filename = f"{company}_{date_str}.json"
+
+    # 8) Skriv ut og lagre resultatet.
     print("Resultat fra OpenAI (JSON):")
     print(json.dumps(data, indent=2, ensure_ascii=False))
-
-    # 8) Lagre resultatet til en fil
-    with open("resultat.json", "w", encoding="utf-8") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 if __name__ == "__main__":
-    main()
-
-
-
-
+    # Eksempel på kjøring for "sdiptech"
+    run_analysis_for_company("sdiptech")

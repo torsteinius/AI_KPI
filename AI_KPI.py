@@ -34,8 +34,8 @@ def read_and_combine_pdfs(pdf_dir: str, prefix: str) -> str:
 
 def run_analysis_for_company(company: str) -> None:
     """
-    Kjører analyse for et gitt selskap. 
-    Resultatet lagres i en fil: {company}_{YYYYMMDD}.json.
+    Kjører analyse for et gitt selskap.
+    Resultatet lagres i en fil: results/{company}_{YYYYMMDD}.json.
     Selskap, år, kvartal (og de øvrige feltene) hentes automatisk av LLM fra PDF-innholdet.
     """
 
@@ -52,11 +52,10 @@ def run_analysis_for_company(company: str) -> None:
     # 3) Opprett OpenAI-modellen.
     openai_model = OpenAIModel(
         instructions=instructions,
-        model_name="gpt-4o-mini"  # Sett til riktig modellnavn / ID
+        model_name="gpt-4o-mini"  # Just an example
     )
 
-    # 4) Bygg user-prompt: vi ber spesifikt om at LLM returnerer feltene
-    #    "company", "year", "quarter" samt de ulike nøkkeltallene.
+    # 4) Bygg user-prompt.
     user_text = f"""
         Du får nå innholdet fra én eller flere PDF-filer (for eksempel {company}-rapporter),
         samlet nedenfor:
@@ -83,12 +82,10 @@ def run_analysis_for_company(company: str) -> None:
 
         ### Slik skal feltverdiene tolkes:
         - **company**: Selskapets navn (slik det fremgår av PDF-en, eller {company} om usikkert).
-        - **year**: Hvilket år tallene gjelder for. 
-        - **quarter**: Hvilket kvartal tallene gjelder for (f.eks. "Q4"). 
-        
-        - **revenue**: Totale inntekter (i MSEK). Hvis tallet kun finnes i annen valuta, 
-                      konverter så godt det lar seg gjøre, eller sett `null` hvis usikkert.
+        - **year**: Hvilket år tallene gjelder.
+        - **quarter**: Hvilket kvartal tallene gjelder (f.eks. "Q4").
 
+        - **revenue**: Totale inntekter (i MSEK). 
         - **operating_income**: Driftsresultat (i MSEK).
         - **profit_before_tax**: Resultat før skatt (i MSEK).
         - **profit_after_tax**: Resultat etter skatt (i MSEK).
@@ -119,16 +116,19 @@ def run_analysis_for_company(company: str) -> None:
     except json.JSONDecodeError:
         data = {}
 
-    # 7) Velg filnavn som inkluderer company og dagens dato.
+    # 7) Lag filnavn og sti til katalogen "results".
     date_str = datetime.now().strftime("%Y%m%d")
-    filename = f"{company}_{date_str}.json"
+    if not os.path.exists("results"):
+        os.makedirs("results")  # Opprett katalogen hvis den ikke finnes
+
+    filename = os.path.join("results", f"{company}_{date_str}.json")
 
     # 8) Skriv ut og lagre resultatet.
     print("Resultat fra OpenAI (JSON):")
     print(json.dumps(data, indent=2, ensure_ascii=False))
+
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 if __name__ == "__main__":
-    # Eksempel på kjøring for "sdiptech"
     run_analysis_for_company("sdiptech")

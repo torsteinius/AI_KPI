@@ -50,9 +50,9 @@ def run_analysis_for_company(company: str) -> None:
     all_pdf_text = read_and_combine_pdfs(pdf_dir, prefix=company)
 
     # 3) Opprett OpenAI-modellen.
-    openai_model = OpenAIModel(
+    llm_model = OpenAIModel(
         instructions=instructions,
-        model_name="gpt-4o-mini"  # Just an example
+        model_name="gpt-4o-mini"  
     )
 
     # 4) Bygg user-prompt med utvidede KPI-felter:
@@ -139,7 +139,7 @@ def run_analysis_for_company(company: str) -> None:
         f.write(user_text)
 
     # 5) Kjør modellen med user-teksten.
-    raw_response = openai_model.run(user_text)
+    raw_response = llm_model.run(user_text)
 
     # 6) Prøv å parse svaret til et dict (JSON).
     try:

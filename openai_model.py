@@ -7,7 +7,7 @@ class OpenAIModel(LLMModel):
         Example: Hides OpenAI-specific setup (API key, model name, etc.).
         'instructions' is stored in self.instructions for use as the system prompt.
         """
-        super().__init__(instructions)  # Store instructions in self.instructions
+        super().__init__(instructions, model_name)  # Store instructions in self.instructions
         
         # Read API key from secrets.txt
         openai.api_key = None
@@ -19,8 +19,6 @@ class OpenAIModel(LLMModel):
         
         if not openai.api_key:
             raise ValueError("OpenAI API key not found in secrets.txt. Make sure it contains `OAI_Key=YOUR_KEY`.")
-
-        self.model_name = model_name
 
     def _chunk_text(self, text: str, chunk_size: int = 2000) -> list[str]:
         """

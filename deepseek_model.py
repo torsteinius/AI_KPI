@@ -13,7 +13,7 @@ class DeepSeekModel(LLMModel):
         :param instructions: Systemprompt (rolle for AI-en)
         :param model_name: Modellnavn (f.eks. "deepseek-chat", "deepseek-reasoner")
         """
-        super().__init__(instructions)
+        super().__init__(instructions, model_name)
         
         # Hent API-nøkkel fra secrets.txt
         self.api_key = None
@@ -29,7 +29,6 @@ class DeepSeekModel(LLMModel):
         if not self.api_key:
             raise ValueError("DeepSeek API-nøkkel ikke funnet i `secrets.txt`. Sørg for at den inneholder `DeepSeek_Key=DIN_API_NØKKEL`.")
 
-        self.model_name = model_name
         self.api_url = "https://api.deepseek.com/v1/chat/completions"  # OpenAI-kompatibel endpoint
 
     def run(self, text: str) -> str:

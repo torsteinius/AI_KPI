@@ -1,5 +1,6 @@
 import os
 import json
+import csv
 import PyPDF2
 from datetime import datetime
 from openai_model import OpenAIModel
@@ -15,15 +16,56 @@ def extract_text_from_pdf(pdf_file: str) -> str:
                 text += page_text + "\n"
     return text
 
-def read_and_combine_pdfs(pdf_dir: str, prefix: str) -> str:
-    """ Leser og kombinerer tekst fra alle PDF-er med gitt prefiks. """
+def read_and_combine_pdfs(pdf_dir: str, prefix: str, read_files_csv: str = "operation/read_files.csv") -> str:
+    """
+    Leser og kombinerer tekst fra alle PDF-er med gitt prefiks.
+    Logger filnavn i read_files_csv for å unngå duplikatlesing.
+    Skriver også ut filer som allerede er lest, for oversikt.
+    """
+
+    # Sørg for at katalogen 'operation' finnes, hvis ikke opprettes den.
+    os.makedirs(os.path.dirname(read_files_csv), exist_ok=True)
+
+    # 1) Les inn allerede behandlede filer fra CSV
+    read_files = set()
+    if os.path.exists(read_files_csv):
+        with open(read_files_csv, "r", newline="", encoding="utf-8") as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                if row:  # Hopp over tomme rader
+                    read_files.add(row[0])
+
+    # 2) Finn alle relevante PDF-filer
+    all_files = [f for f in os.listdir(pdf_dir) if f.startswith(prefix) and f.endswith(".pdf")]
+
     combined_text = ""
-    for filename in os.listdir(pdf_dir):
-        if filename.startswith(prefix) and filename.endswith(".pdf"):
+    newly_read_files = []
+
+    # 3) Les filer som ikke er lest tidligere, og bygg opp combined_text
+    for filename in all_files:
+        if filename not in read_files:
             file_path = os.path.join(pdf_dir, filename)
             pdf_text = extract_text_from_pdf(file_path)
             combined_text += f"\n--- Innhold fra {filename} ---\n"
             combined_text += pdf_text
+
+            # Oppdater read_files med ny fil
+            newly_read_files.append(filename)
+            read_files.add(filename)
+
+    # 4) Lagre hele settet med leste filer til CSV på nytt
+    with open(read_files_csv, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        for f in sorted(read_files):
+            writer.writerow([f])
+
+    # 5) Identifiser filer som ikke ble lest (fordi de var lest før)
+    already_read_files = [f for f in all_files if f not in newly_read_files]
+    if already_read_files:
+        print("Følgende filer ble ikke lest (allerede behandlet tidligere):")
+        for f in already_read_files:
+            print(f)
+
     return combined_text
 
 def load_instructions(filename: str) -> str:
@@ -41,15 +83,14 @@ def run_analysis_for_company(company: str) -> None:
     else:
         raise FileNotFoundError(f"Instruksjonsfilen '{instructions_file}' ble ikke funnet.")
 
-
-    # 2) Les PDF-filer i katalogen 'pdf' som starter med selskapets navn.
+    # 2) Les og kombiner PDF-filer i katalogen 'pdf' som starter med selskapets navn
     pdf_dir = "pdf"
-    all_pdf_text = read_and_combine_pdfs(pdf_dir, prefix=company)
+    all_pdf_text = read_and_combine_pdfs(pdf_dir, prefix=company, read_files_csv="operation/read_files.csv")
 
-    # 3) Opprett OpenAI-modellen.
+    # 3) Opprett OpenAI-modellen
     llm_model = OpenAIModel(
         instructions=instructions,
-        model_name="gpt-4o-mini"  
+        model_name="gpt-4o-mini"
     )
 
     # 4) Bygg user-prompt
@@ -81,4 +122,4 @@ def run_analysis_for_company(company: str) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 if __name__ == "__main__":
-    run_analysis_for_company("Nekkar")
+    run_analysis_for_company("GRANGES")

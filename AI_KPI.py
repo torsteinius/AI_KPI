@@ -7,6 +7,7 @@ import requests
 from datetime import datetime
 from urllib.parse import urlparse
 from openai_model import OpenAIModel
+from url_handler import URLHandler
 
 def extract_text_from_pdf(pdf_file: str) -> str:
     """Leser tekst fra en PDF-fil ved hjelp av PyPDF2."""
@@ -68,7 +69,7 @@ def load_instructions(filename: str) -> str:
     with open(filename, "r", encoding="utf-8") as f:
         return f.read()
 
-def fetch_pdf_urls(company: str) -> list:  # This does not work at the current time
+def fetch_pdf_urls(company: str) -> list:  # Denne fungerer ikke for øyeblikket
     """
     Ber en modell om å finne URL-er til de offisielle PDF-rapportene og presentasjonene 
     for siste kvartal for et gitt selskap. Modellen skal kun returnere URL-ene, én per linje.
@@ -118,59 +119,29 @@ def download_pdf(url: str, dest_folder: str, filename: str) -> bool:
         print(f"Kunne ikke laste ned {url}: {e}")
         return False
 
-def process_report_urls(report_urls_csv: str, pdf_dir: str, read_files_csv: str) -> None:
+def download_pdfs_urls(company: str, report_urls: list, pdf_dir: str) -> None:
     """
-    Leser ReportURLs.csv (én URL per linje, uten header) og laster ned PDF-er
-    som ikke allerede er behandlet (basert på filnavn i read_files_csv).
+    Leser listen med rapport-URL-er og laster ned PDF-ene til den spesifiserte mappen.
     """
-    if not os.path.exists(report_urls_csv):
-        print(f"Finner ikke {report_urls_csv}.")
-        return
-    
-    # Les URL-er fra ReportURLs.csv
-    with open(report_urls_csv, "r", newline="", encoding="utf-8") as csvfile:
-        reader = csv.reader(csvfile)
-        urls = [row[0].strip() for row in reader if row and row[0].strip() != ""]
-    
-    # Les allerede behandlede filer fra read_files_csv
-    processed_files = set()
-    if os.path.exists(read_files_csv):
-        with open(read_files_csv, "r", newline="", encoding="utf-8") as csvfile:
-            reader = csv.reader(csvfile)
-            for row in reader:
-                if row:
-                    processed_files.add(row[0])
-    
-    for url in urls:
+    for url in report_urls:
         filename = os.path.basename(urlparse(url).path)
-        if filename in processed_files:
-            print(f"Filen {filename} er allerede behandlet, hopper over.")
+        dest_folder = os.path.join(pdf_dir, company)
+        if os.path.exists(os.path.join(dest_folder, filename)):
+            print(f"PDF '{filename}' allerede lastet ned.")
             continue
-        success = download_pdf(url, pdf_dir, filename)
-        if success:
-            processed_files.add(filename)
-    
-    # Oppdater read_files_csv med alle behandlede filnavn
-    os.makedirs(os.path.dirname(read_files_csv), exist_ok=True)
-    with open(read_files_csv, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile)
-        for f in sorted(processed_files):
-            writer.writerow([f])
+        download_pdf(url, dest_folder, filename)
 
 def run_analysis_for_company(company: str) -> None:
     """Kjører analyse for et gitt selskap basert på nedlastede PDF-er."""
-    # Last inn instruksjoner for analyse
     instructions_file = "LLMText/json_instructions.txt"
     if os.path.exists(instructions_file):
         instructions = load_instructions(instructions_file)
     else:
         raise FileNotFoundError(f"Instruksjonsfilen '{instructions_file}' ble ikke funnet.")
 
-    # Les og kombiner PDF-filer med prefiks som selskapets navn
     pdf_dir = "pdf"
-    all_pdf_text = read_and_combine_pdfs(pdf_dir, prefix=company, read_files_csv="operation/read_files.csv")
+    all_pdf_text = read_and_combine_pdfs(os.path.join(pdf_dir, company), prefix=company, read_files_csv="operation/read_files.csv")
 
-    # Opprett modellen for analyse
     llm_model = OpenAIModel(
         instructions=instructions,
         model_name="gpt-4"
@@ -178,12 +149,10 @@ def run_analysis_for_company(company: str) -> None:
 
     user_text = all_pdf_text
 
-    # Lagre prompt til fil for oversikt
     os.makedirs("prompt", exist_ok=True)
     with open(os.path.join("prompt", f"{company}_prompt.txt"), "w", encoding="utf-8") as f:
         f.write(user_text)
 
-    # Kjør modellen og hent rå respons
     raw_response = llm_model.run(user_text)
 
     try:
@@ -191,7 +160,6 @@ def run_analysis_for_company(company: str) -> None:
     except json.JSONDecodeError:
         data = {}
 
-    # Lagre resultatet til fil
     os.makedirs("results", exist_ok=True)
     date_str = datetime.now().strftime("%Y%m%d")
     result_filename = os.path.join("results", f"{company}_{date_str}.json")
@@ -202,15 +170,17 @@ def run_analysis_for_company(company: str) -> None:
     with open(result_filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-
 if __name__ == "__main__":
     # Definer selskapet for analysen
-    #company = "YourCompanyName"  # Erstatt med ønsket selskapsnavn
+    company = "Kitron"  # Erstatt med ønsket selskapsnavn
 
-    # 1) Hent URL-er fra ReportURLs.csv som ikke er behandlet tidligere
-    process_report_urls("ReportURLs.csv", pdf_dir="pdf", read_files_csv="operation/read_files.csv") 
-    
+    # 1) Hent URL-er for selskapet
+    url_handler = URLHandler()
+    kitron_urls = url_handler.get_urls_for_company(company)
+    print(f"URL-er for {company}: {kitron_urls}")
 
-    # Run through PDFs that have not been read yet
+    # 2) Last ned PDF-er fra URL-ene
+    download_pdfs_urls(company, kitron_urls, pdf_dir="pdf")
+
     # 3) Kjør analyse basert på de nedlastede PDF-ene
     run_analysis_for_company(company)

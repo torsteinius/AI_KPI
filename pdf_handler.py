@@ -117,7 +117,38 @@ class PDFHandler:
 
     def _update_read_files(self, read_files: set):
         """Updates the CSV file with the processed filenames."""
-        with open(self.read_files_csv, "w", newline="", encoding="utf-8") as csvfile:
+        with open(self.__read_files_csv, "w", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
             for f in sorted(read_files):
                 writer.writerow([f])
+
+    def test_functions(self):
+        """Test the PDFHandler class."""
+        pdf1 = "pdf/tickers/elab/elliptic-labs-report-2023-q4.pdf"
+        pdf2 = "pdf/tickers/elab/elliptic-labs-report-2023-q4.pdf"
+
+        pdf_handler = PDFHandler("test_ticker")
+        text = pdf_handler.extract_text_from_pdf(pdf1)
+        assert text.strip() == "Elliptic Labs"
+
+        pdf_handler.extract_text_from_pdf = lambda x: "PDF Content"
+        result = pdf_handler.read_one_unread_pdf("test_folder")
+        assert result == "PDF Content"
+
+        pdf_handler.extract_text_from_pdf = lambda x: "Content 1" if x == pdf1 else "Content 2"
+        result = pdf_handler.read_and_combine_pdfs("test_folder")
+        assert "Content 1" in result
+        assert "Content 2" in result
+
+        pdf_handler.download_pdf = lambda x, y: True
+        success = pdf_handler.download_pdf("http://example.com/sample.pdf")
+        assert success
+
+        read_files = pdf_handler._get_read_files()
+        assert read_files == {pdf1, pdf2}
+
+        print("All tests passed.")
+
+if __name__ == "__main__":
+    pdf_handler = PDFHandler("test_ticker")
+    pdf_handler.test_functions()

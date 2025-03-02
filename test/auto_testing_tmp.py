@@ -6,6 +6,9 @@ import PyPDF2
 import requests
 from pdf_handler import PDFHandler  # Assuming your class is in pdf_handler.py
 
+pdf1 = "pdf/tickers/elab/elliptic-labs-report-2023-q4.pdf"
+pdf2 = "pdf/tickers/elab/elliptic-labs-report-2023-q4.pdf"
+
 class TestPDFHandler(unittest.TestCase):
     
     @patch("builtins.open", new_callable=mock_open, read_data="mock pdf data")
@@ -20,7 +23,7 @@ class TestPDFHandler(unittest.TestCase):
         text = pdf_handler.extract_text_from_pdf("dummy.pdf")
         self.assertEqual(text.strip(), "Sample PDF text")
 
-    @patch("os.listdir", return_value=["file1.pdf", "file2.pdf"])
+    @patch("os.listdir", return_value=[pdf1, pdf2])
     @patch("builtins.open", new_callable=mock_open)
     @patch("csv.reader", return_value=[["file1.pdf"]])
     def test_read_one_unread_pdf(self, mock_csv_reader, mock_file, mock_listdir):
@@ -29,9 +32,9 @@ class TestPDFHandler(unittest.TestCase):
         result = pdf_handler.read_one_unread_pdf("test_folder")
         self.assertEqual(result, "PDF Content")
 
-    @patch("os.listdir", return_value=["file1.pdf", "file2.pdf"])
+    @patch("os.listdir", return_value=[pdf1, pdf2])
     @patch("builtins.open", new_callable=mock_open)
-    @patch("csv.reader", return_value=[["file1.pdf"]])
+    @patch("csv.reader", return_value=[[pdf1]])
     def test_read_and_combine_pdfs(self, mock_csv_reader, mock_file, mock_listdir):
         pdf_handler = PDFHandler("test_ticker")
         pdf_handler.extract_text_from_pdf = MagicMock(side_effect=["Content 1", "Content 2"])
@@ -58,7 +61,7 @@ class TestPDFHandler(unittest.TestCase):
     def test_get_read_files(self, mock_file, mock_exists):
         pdf_handler = PDFHandler("test_ticker")
         read_files = pdf_handler._get_read_files()
-        self.assertEqual(read_files, {"file1.pdf", "file2.pdf"})
+        self.assertEqual(read_files, {pdf1, pdf2})
 
 if __name__ == "__main__":
     unittest.main()

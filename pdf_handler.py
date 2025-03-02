@@ -3,12 +3,17 @@ import csv
 import PyPDF2
 import requests
 from urllib.parse import urlparse
+from settings import Settings
+
 
 class PDFHandler:
-    def __init__(self, ticker_path, read_files_csv: str = "operation/read_files.csv"):
-        self.read_files_csv = read_files_csv
-        os.makedirs(os.path.dirname(self.read_files_csv), exist_ok=True)
-        self.ticker_path = ticker_path
+    def __init__(self, ticker_path: str):
+        self.__ticker_path = ticker_path
+        self.__settings = Settings()
+        self.__read_files_csv = self.__settings.read_files_csv
+        os.makedirs(os.path.dirname(self.__read_files_csv), exist_ok=True)
+        self.__ticker_root_path = self.__settings.pdf_root
+        self.__full_ticker_path = f"{self.__ticker_root_path}/{self.__ticker_path}"
 
     def read_one_unread_pdf(self, pdf_dir: str) -> str:
         """
@@ -16,7 +21,7 @@ class PDFHandler:
         Logs filenames in read_files_csv to avoid duplicate readings.
         """
         read_files = self._get_read_files()
-        all_files = [f for f in os.listdir(f"{pdf_dir}/tickers/{self.ticker_path}") if f.endswith(".pdf")]
+        all_files = [f for f in os.listdir(f"{self.__full_ticker_path}") if f.endswith(".pdf")]
 
         for filename in all_files:
             if filename not in read_files:
@@ -35,7 +40,7 @@ class PDFHandler:
         Logs filenames in read_files_csv to avoid duplicate readings.
         """
         read_files = self._get_read_files()
-        all_files = [f for f in os.listdir(f"{pdf_dir}/tickers/{self.ticker_path}") if f.endswith(".pdf")]
+        all_files = [f for f in os.listdir(f"{self.__full_ticker_path}") if f.endswith(".pdf")]
 
         combined_text = ""
         newly_read_files = []
@@ -83,7 +88,7 @@ class PDFHandler:
         if (filename is None):
             filename = self._extract_filename_from_url(url)
 
-        dest_folder = f"tickers/{self.ticker_path}"
+        dest_folder = f"{self.ticker_path}"
         os.makedirs(dest_folder, exist_ok=True)
         try:
             response = requests.get(url, stream=True, timeout=10)
@@ -102,8 +107,8 @@ class PDFHandler:
     def _get_read_files(self) -> set:
         """Retrieves the set of already processed files from read_files_csv."""
         read_files = set()
-        if os.path.exists(self.read_files_csv):
-            with open(self.read_files_csv, "r", newline="", encoding="utf-8") as csvfile:
+        if os.path.exists(self.__read_files_csv):
+            with open(self.__read_files_csv, "r", newline="", encoding="utf-8") as csvfile:
                 reader = csv.reader(csvfile)
                 for row in reader:
                     if row:

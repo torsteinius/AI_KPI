@@ -40,14 +40,14 @@ def download_pdfs_urls(company: str, report_urls: list, pdf_dir: str) -> None:
     """
     Leser listen med rapport-URL-er og laster ned PDF-ene til den spesifiserte mappen.
     """
-    pdf_handler = PDFHandler()
+    pdf_handler = PDFHandler(f"pdf/tickers/{company}")
     for url in report_urls:
         filename = os.path.basename(urlparse(url).path)
         dest_folder = os.path.join(pdf_dir, company)
         if os.path.exists(os.path.join(dest_folder, filename)):
             print(f"PDF '{filename}' allerede lastet ned.")
             continue
-        pdf_handler.download_pdf(url, dest_folder, filename)
+        pdf_handler.download_pdf(url, filename)
 
 def run_analysis_for_company(company: str) -> None:
     """Kjører analyse for et gitt selskap basert på nedlastede PDF-er."""

@@ -123,6 +123,14 @@ class PDFHandler:
                 writer.writerow([f])
 
     def test_functions(self):
+        """
+        Må teste flg:
+            generere neste pdf-url dersom man er  i neste kvartal
+            finne ut hvilke filer som ikke er lastet ned basert på URL liste og filer
+            sette sammen pdfer
+            lese en og en pdf og generere json for dem seperat
+            sette sammen jsons i et bestemt format
+        
         """Test the PDFHandler class."""
         pdf1 = "pdf/tickers/elab/elliptic-labs-report-2023-q4.pdf"
         pdf2 = "pdf/tickers/elab/elliptic-labs-report-2023-q4.pdf"

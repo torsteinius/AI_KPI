@@ -26,18 +26,63 @@ class Json_Handler:
     def get_json_items(self):
         return self.json.items()
     
-    def compine_quarter_json(files_to_one, output_file):
+    def combine_same_quarter(jsonA, jsonB) -> dict:
         """
-        1) if wame quarter, the best value is used;
-           a) if one exist, the other not, the one that exist is used
-           b) if both exist, the one with the longest text is used
-           c) if a value in both, the average is used, but marked as might be wrong
-        2) if different quarters, all values are kept, but they are in seperate lists marked with the quarter
-        3) if the same value is in both, tis value is used
+        Combine two JSON dicts from the same quarter/year/company
+        into a single dict, using the logic:
+        - If key only in one, use that.
+        - If key in both:
+            - If numeric and identical, keep it.
+            - If numeric and different, use average, mark as might be wrong.
+            - If text and the key is 500tegnoppsummering, combine them.
+            - If text (non-summary), use the longer one.
         """
-        data = {}
-        for file in files_to_one:
-            with open(file, 'r') as f:
-                data.update(json.load(f))
-        with open(output_file, 'w') as f:
-            json.dump(data, f)
+        combined = {}
+        all_keys = set(jsonA.keys()) | set(jsonB.keys())
+        
+        for key in all_keys:
+            valA = jsonA.get(key)
+            valB = jsonB.get(key)
+            
+            # CASE 1: Key only in one of them
+            if valA is not None and valB is None:
+                combined[key] = valA
+                continue
+            if valA is None and valB is not None:
+                combined[key] = valB
+                continue
+            
+            # Now both valA and valB exist. We check their types and/or equality.
+            if isinstance(valA, (int, float)) and isinstance(valB, (int, float)):
+                # Numeric fields
+                if valA == valB:
+                    # Exactly the same => just keep the value
+                    combined[key] = valA
+                else:
+                    # Different => average and mark as "might be wrong"
+                    avg_value = (valA + valB) / 2
+                    # You can store as a string with a note, or store two fields, etc.
+                    combined[key] = f"{avg_value} (might be wrong: avg of {valA} & {valB})"
+            
+            elif isinstance(valA, str) and isinstance(valB, str):
+                # Text fields
+                if key == "500tegnoppsummering":
+                    # Combine them into one big text
+                    combined[key] = valA + "\n" + valB
+                else:
+                    # Use the longer text
+                    if len(valA) >= len(valB):
+                        combined[key] = valA
+                    else:
+                        combined[key] = valB
+                        
+            else:
+                # If they are the same object (or same value) in some other type
+                # or both equal but not numeric or text
+                if valA == valB:
+                    combined[key] = valA
+                else:
+                    # Fallback: you might choose one or store a list.
+                    combined[key] = [valA, valB]
+        
+        return combined

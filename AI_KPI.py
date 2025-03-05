@@ -38,7 +38,7 @@ def run_analysis_for_company(company: str) -> None:
 
     # 2) Filtrer til kun de som IKKE er prosessert (processed=False)
     unread_list = [p for p in pdf_list if not p["processed"]]
-    if not unread_list:
+    if not unread_list and False:
         print(f"Ingen nye (uleste) PDF-filer for '{company}'.")
         return
 
@@ -96,6 +96,18 @@ def run_analysis_for_company(company: str) -> None:
     print("Alle uleste PDF-filer er nå behandlet.")
 
 
+
+def download_pdfs_urls(company: str, report_urls: list) -> None:
+    pdf_handler = PDFHandler(company)
+    for url in report_urls:
+        filename = os.path.basename(urlparse(url).path)
+        if pdf_handler.is_pdf_downloaded(filename):
+            print(f"PDF '{filename}' allerede lastet ned.")
+        else:
+            pdf_handler.download_pdf(url, filename)
+
+
+
 if __name__ == "__main__":
     # Eksempel: Kjør for "Kitron"
     company = "Kitron"
@@ -106,15 +118,6 @@ if __name__ == "__main__":
     print(f"URL-er for {company}: {kitron_urls}")
 
     # 2) Last ned PDF-ene (om nødvendig)
-    def download_pdfs_urls(company: str, report_urls: list) -> None:
-        pdf_handler = PDFHandler(company)
-        for url in report_urls:
-            filename = os.path.basename(urlparse(url).path)
-            if pdf_handler.is_pdf_downloaded(filename):
-                print(f"PDF '{filename}' allerede lastet ned.")
-            else:
-                pdf_handler.download_pdf(url, filename)
-
     download_pdfs_urls(company, kitron_urls)
 
     # 3) Kjør analyse for hver ulest PDF individuelt

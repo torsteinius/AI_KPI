@@ -1,3 +1,4 @@
 *.txt
 venv
 secrets.txt
+.DS_Store

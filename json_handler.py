@@ -44,30 +44,28 @@ class Json_Handler:
             valA = jsonA.get(key)
             valB = jsonB.get(key)
             
-            # CASE 1: Key only in one of them
-            if valA is not None and valB is None:
-                combined[key] = valA
-                continue
+            # 1) If only one has the key, take that.
             if valA is None and valB is not None:
                 combined[key] = valB
                 continue
+            if valB is None and valA is not None:
+                combined[key] = valA
+                continue
             
-            # Now both valA and valB exist. We check their types and/or equality.
+            # 2) Both have the key
             if isinstance(valA, (int, float)) and isinstance(valB, (int, float)):
                 # Numeric fields
                 if valA == valB:
-                    # Exactly the same => just keep the value
-                    combined[key] = valA
+                    combined[key] = valA  # identical => keep
                 else:
-                    # Different => average and mark as "might be wrong"
-                    avg_value = (valA + valB) / 2
-                    # You can store as a string with a note, or store two fields, etc.
-                    combined[key] = f"{avg_value} (might be wrong: avg of {valA} & {valB})"
+                    # average them (and flag it)
+                    avg_val = (valA + valB) / 2
+                    combined[key] = f"{avg_val} (might be wrong: avg of {valA} & {valB})"
             
             elif isinstance(valA, str) and isinstance(valB, str):
                 # Text fields
                 if key == "500tegnoppsummering":
-                    # Combine them into one big text
+                    # Combine them so nothing is lost
                     combined[key] = valA + "\n" + valB
                 else:
                     # Use the longer text
@@ -75,14 +73,14 @@ class Json_Handler:
                         combined[key] = valA
                     else:
                         combined[key] = valB
-                        
+            
             else:
-                # If they are the same object (or same value) in some other type
-                # or both equal but not numeric or text
+                # They might both be None, or differ in some other type. 
+                # If identical, keep as-is:
                 if valA == valB:
                     combined[key] = valA
                 else:
-                    # Fallback: you might choose one or store a list.
+                    # fallback if somehow we have different non-numeric, non-string
                     combined[key] = [valA, valB]
         
         return combined

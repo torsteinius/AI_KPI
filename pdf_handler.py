@@ -5,6 +5,33 @@ import requests
 from urllib.parse import urlparse
 from settings import Settings
 
+"""
+PDFHandler er en klasse designet for å håndtere nedlasting, lagring, og lesing av PDF-rapporter 
+tilknyttet en spesifikk aksje (ticker). Hovedformålet med klassen er å automatisere prosessen 
+med å hente kvartalsrapporter eller andre relevante PDF-dokumenter for et gitt selskap og gjøre 
+innholdet tilgjengelig for videre analyse.
+
+Hovedfunksjonalitet:
+- **Nedlasting av PDF-filer**: Klassen kan laste ned PDF-er fra en gitt URL og lagre dem 
+  i en dedikert mappe for den spesifikke tickeren.
+- **Sporing av leste PDF-filer**: Den opprettholder en liste over allerede behandlede filer 
+  ved å logge filnavnene i en CSV-fil, slik at samme fil ikke behandles flere ganger.
+- **Uthenting av tekst fra PDF**: Ved hjelp av PyPDF2 kan klassen trekke ut tekst fra 
+  PDF-dokumenter for videre analyse.
+- **Lesing av én ulest PDF om gangen**: Den kan hente tekstinnholdet fra den første 
+  uleste PDF-en i mappen og registrere den som lest.
+- **Sammenstilling av flere PDF-er**: Klassen kan lese og kombinere tekstinnholdet fra 
+  alle uleste PDF-er i en mappe og returnere den samlede teksten.
+- **Lister nedlastede PDF-filer**: Gir en oversikt over lagrede PDF-er, samt status for 
+  hvorvidt de har blitt behandlet.
+- **Testing og validering**: Inneholder en `test_functions`-metode som simulerer ulike scenarier 
+  for å verifisere funksjonaliteten.
+
+Bruksområder:
+Denne klassen kan brukes i automatiserte finansielle analyser, der man ønsker å hente, 
+lagre og analysere kvartalsrapporter eller årsrapporter for ulike selskaper. Den kan 
+også brukes i andre sammenhenger der systematisk håndtering av PDF-dokumenter er nødvendig.
+"""
 
 class PDFHandler:
     def __init__(self, ticker: str):

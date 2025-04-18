@@ -54,3 +54,6 @@ class MFNReportScraper:
 if __name__ == "__main__":
     scraper = MFNReportScraper("axfood", delay=8.0)  # Change 'axfood' to any company slug from MFN
     scraper.download_pdfs()
+
+
+#https://live.euronext.com/nb/product/equities/NO0013353219-MERK?utm_source=chatgpt.com#CompanyPressRelease-12628204

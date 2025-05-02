@@ -1,59 +1,74 @@
-import os
-import time
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+import re, time, asyncio, aiohttp
 from pathlib import Path
+from urllib.parse import urlparse, urljoin
+from playwright.async_api import async_playwright
+from tqdm.asyncio import tqdm
 
-class MFNReportScraper:
-    def __init__(self, company_slug: str, output_dir: str = "mfn_reports", delay: float = 5.0):
-        self.company_slug = company_slug.lower()
-        self.base_url = f"https://mfn.se/all/a/{self.company_slug}"
-        self.output_dir = Path(output_dir) / self.company_slug
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.delay = delay  # delay between requests to avoid suspicion
 
-    def get_pdf_links(self):
-        print(f"Fetching PDF links for '{self.company_slug}' from MFN...")
-        response = requests.get(self.base_url)
-        soup = BeautifulSoup(response.text, "html.parser")
-        links = []
 
-        for article in soup.select("article"):
-            link_tag = article.find("a")
-            if not link_tag:
+START_URL = "https://live.euronext.com/nb/products/equities/company-news"
+START_URL = "https://live.euronext.com/nb/listview/company-press-release/118710"
+OUTPUT_DIR = Path("euronext_reports")
+PDF_RE = re.compile(r"https?://[^\s\"']+?\.pdf", re.I)
+
+def slugify(text, n=120):
+    import re, unicodedata, pathlib
+    text = unicodedata.normalize("NFKD", text)
+    text = re.sub(r"[^\w\s-]", " ", text).strip()
+    text = re.sub(r"\s+", "_", text)
+    return (text or "file")[:n] + ".pdf"
+
+async def gather_pdfs():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        print("↳ Laster siden …")
+        await page.goto(START_URL, wait_until="domcontentloaded")
+
+        # 1) lukk cookie/consent hvis den finnes
+        try:
+            await page.click("button#onetrust-accept-btn-handler", timeout=3000)
+            print("   – cookie-banner lukket")
+        except:
+            pass  # ingen banner
+
+        # 2) vent til trafikken har roet seg
+        await page.wait_for_load_state("networkidle", timeout=20000)
+
+        html = await page.content()
+        await browser.close()
+
+    return set(PDF_RE.findall(html))
+
+async def download_all(links):
+    OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
+    async with aiohttp.ClientSession(
+        headers={"User-Agent": "Mozilla/5.0 (EuronextPDFBot/1.0)"}
+    ) as sess:
+        tasks = []
+        for url in links:
+            name = slugify(Path(urlparse(url).path).stem)
+            dest = OUTPUT_DIR / name
+            if dest.exists():
                 continue
+            tasks.append(_dl(sess, url, dest))
+        for f in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Nedlasting"):
+            await f
 
-            href = link_tag.get("href")
-            if href and href.endswith(".pdf"):
-                full_url = urljoin("https://mfn.se", href)
-                title = article.text.strip().split("\n")[0][:80].replace(" ", "_").replace("/", "_")
-                filename = f"{title}.pdf"
-                links.append((full_url, filename))
+async def _dl(sess, url, dest):
+    try:
+        async with sess.get(url, timeout=30) as r:
+            if r.status == 200:
+                dest.write_bytes(await r.read())
+    except Exception as e:
+        print(f"⚠️  kunne ikke hente {url}: {e}")
 
-        print(f"Found {len(links)} PDF reports.")
-        return links
+async def main():
+    pdf_links = await gather_pdfs()
+    print(f"Fant {len(pdf_links)} PDF-lenker")
+    if pdf_links:
+        await download_all(pdf_links)
+    print("✅ ferdig")
 
-    def download_pdfs(self):
-        links = self.get_pdf_links()
-        for idx, (url, filename) in enumerate(links):
-            path = self.output_dir / filename
-            if path.exists():
-                print(f"[{idx+1}/{len(links)}] Skipping already downloaded: {filename}")
-                continue
-
-            print(f"[{idx+1}/{len(links)}] Downloading: {filename}")
-            response = requests.get(url)
-            with open(path, "wb") as f:
-                f.write(response.content)
-            time.sleep(self.delay)
-
-        print("✅ Done downloading all available PDFs.")
-
-# Example usage
 if __name__ == "__main__":
-    scraper = MFNReportScraper("axfood", delay=8.0)  # Change 'axfood' to any company slug from MFN
-    scraper.download_pdfs()
-
-
-#https://live.euronext.com/nb/product/equities/NO0013353219-MERK?utm_source=chatgpt.com#CompanyPressRelease-12628204
+    asyncio.run(main())

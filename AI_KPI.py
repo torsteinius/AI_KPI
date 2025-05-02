@@ -61,7 +61,7 @@ def run_analysis_for_company(company: str) -> None:
         # Kjør LLM med instruksjoner + PDF-tekst
         llm_model = OpenAIModel(
             instructions=instructions,
-            model_name="gpt-4"
+            model_name="gpt-4o"
         )
         raw_response = llm_model.run(pdf_text)
 
@@ -109,16 +109,16 @@ def download_pdfs_urls(company: str, report_urls: list) -> None:
 
 
 if __name__ == "__main__":
-    # Eksempel: Kjør for "Kitron"
-    company = "Kitron"
+    # Eksempel: Kjør for "Svedberg"
+    company = "Svedberg"
 
-    # 1) Hent URL-er for "Kitron"
+    # 1) Hent URL-er for "Svedberg" fra URLHandler
     url_handler = URLHandler()
-    kitron_urls = url_handler.get_urls_for_company(company)
-    print(f"URL-er for {company}: {kitron_urls}")
+    touch_urls = url_handler.get_urls_for_company(company)
+    print(f"URL-er for {company}: {touch_urls}")
 
     # 2) Last ned PDF-ene (om nødvendig)
-    download_pdfs_urls(company, kitron_urls)
+    download_pdfs_urls(company, touch_urls)
 
     # 3) Kjør analyse for hver ulest PDF individuelt
     run_analysis_for_company(company)

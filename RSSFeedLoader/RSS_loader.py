@@ -11,21 +11,18 @@ class RSSFeedSubscriber:
     Fetches and parses RSS feeds and normalizes entries.
     """
     def __init__(self, feed_urls):
-        if isinstance(feed_urls, str):
-            self.feed_urls = [feed_urls]
-        else:
-            self.feed_urls = feed_urls
+        self.feed_urls = [feed_urls] if isinstance(feed_urls, str) else feed_urls
 
     def fetch_entries(self):
         all_entries = []
         for url in self.feed_urls:
+            print(f"Fetching RSS feed: {url}")
             feed = feedparser.parse(url)
+            print(f"  Found {len(feed.entries)} entries")
             for entry in feed.entries:
-                published = None
-                if hasattr(entry, 'published_parsed'):
+                published = datetime.utcnow()
+                if getattr(entry, 'published_parsed', None):
                     published = datetime(*entry.published_parsed[:6])
-                else:
-                    published = datetime.utcnow()
                 all_entries.append({
                     'id': entry.get('id', entry.link),
                     'title': entry.get('title', ''),
@@ -34,8 +31,9 @@ class RSSFeedSubscriber:
                     'summary': entry.get('summary', '')
                 })
         # remove duplicates by 'id'
-        unique = {e['id']: e for e in all_entries}
-        return list(unique.values())
+        unique_entries = list({e['id']: e for e in all_entries}.values())
+        print(f"Total unique entries fetched: {len(unique_entries)}")
+        return unique_entries
 
 
 class PDFDownloader:
@@ -44,7 +42,13 @@ class PDFDownloader:
     """
     def __init__(self, base_dir: Path):
         self.base_dir = base_dir
+        self.base_dir.mkdir(parents=True, exist_ok=True)
         self.pdf_dir = base_dir / "pdfs"
+        if self.pdf_dir.exists() and not self.pdf_dir.is_dir():
+            raise NotADirectoryError(
+                f"Expected a directory at {self.pdf_dir}, but found a file. "
+                "Please remove or rename it before running the downloader."
+            )
         self.pdf_dir.mkdir(parents=True, exist_ok=True)
 
     def download(self, entry: dict):
@@ -52,12 +56,12 @@ class PDFDownloader:
         if not url.lower().endswith('.pdf'):
             return None
         date_str = entry['published'].strftime("%Y-%m-%d")
-        # sanitize filename
         filename = f"{entry['id'].split('/')[-1].replace('.', '_')}_{date_str}.pdf"
         filepath = self.pdf_dir / filename
         if filepath.exists():
+            print(f"PDF already exists: {filepath}")
             return filepath
-
+        print(f"Downloading PDF: {url}")
         resp = requests.get(url)
         resp.raise_for_status()
         with open(filepath, 'wb') as f:
@@ -82,14 +86,14 @@ class MetadataStore:
             existing = pd.read_parquet(file_path)
             df = pd.concat([existing, df]).drop_duplicates(subset=['id'])
         df.to_parquet(file_path, index=False)
+        print(f"Metadata written to {file_path} (total rows: {len(df)})")
         return file_path
 
 
 def main():
-    # Define your RSS feed URLs here
     FEED_URLS = [
         "https://newsweb.oslobors.no/websearch-rss?identifierId=NHY",
-        # add more feeds as needed
+        # Add more RSS feed URLs here
     ]
 
     base_dir = Path("data").resolve()
@@ -99,18 +103,17 @@ def main():
 
     entries = subscriber.fetch_entries()
     if not entries:
-        print("No new RSS entries found.")
+        print("No new RSS entries found. Check your feed URLs or network connectivity.")
         return
 
-    # Save metadata
     meta_file = store.append(entries)
-    print(f"Metadata saved to {meta_file}")
-
-    # Download any new PDFs
     for entry in entries:
-        pdf_path = downloader.download(entry)
-        if pdf_path:
-            print(f"Downloaded PDF: {pdf_path}")
+        try:
+            pdf_path = downloader.download(entry)
+            if pdf_path:
+                print(f"Saved PDF: {pdf_path}")
+        except Exception as e:
+            print(f"Error downloading {entry['link']}: {e}")
 
 
 if __name__ == "__main__":

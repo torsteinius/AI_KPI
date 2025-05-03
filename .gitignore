@@ -3,3 +3,5 @@ venv
 secrets.txt
 .DS_Store
 __pycache__
+*.db
+Data/

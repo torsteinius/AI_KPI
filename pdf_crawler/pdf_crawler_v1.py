@@ -74,26 +74,43 @@ def extract_pdf_links(html):
     return pdf_urls
 
 
-def download_pdf(pdf_url, dest_folder, filename_hint):
+def get_filepath(dest_folder, filename_hint):
     """
-    Stream-download the PDF into dest_folder, verifying:
-      1) Content-Type header contains 'pdf'
-      2) File starts with '%PDF'
-    Returns saved filepath or None if not a valid PDF.
+    Generate a safe filepath in dest_folder for filename_hint.
     """
     os.makedirs(dest_folder, exist_ok=True)
     safe = re.sub(r"[^A-Za-z0-9\-_.]+", "_", filename_hint)[:100] or "file"
-    filepath = os.path.join(dest_folder, f"{safe}.pdf")
+    return os.path.join(dest_folder, f"{safe}.pdf")
 
+
+def file_exists(dest_folder, filename_hint):
+    """
+    Check if a file with the given filename_hint already exists in dest_folder.
+    """
+    path = get_filepath(dest_folder, filename_hint)
+    return os.path.exists(path)
+
+
+def download_pdf(pdf_url, filepath):
+    """
+    Stream-download the PDF at pdf_url into filepath, verifying:
+      1) Content-Type header contains 'pdf'
+      2) File starts with '%PDF'
+    Returns True if saved, False otherwise.
+    """
     print(f"  ↳ fetching {pdf_url}")
-    resp = requests.get(pdf_url, stream=True, timeout=20)
-    resp.raise_for_status()
+    try:
+        resp = requests.get(pdf_url, stream=True, timeout=20)
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"    ⚠️ failed to fetch: {e}")
+        return False
 
     # 1) Check Content-Type header
     ct = resp.headers.get("Content-Type", "")
     if "pdf" not in ct.lower():
         print(f"    ⚠️ skipped: Content-Type is '{ct}', not PDF")
-        return None
+        return False
 
     # 2) Check magic number in first chunk
     chunks = resp.iter_content(chunk_size=8192)
@@ -101,11 +118,11 @@ def download_pdf(pdf_url, dest_folder, filename_hint):
         first = next(chunks)
     except StopIteration:
         print("    ⚠️ skipped: no data received")
-        return None
+        return False
 
     if not first.startswith(b"%PDF"):
         print("    ⚠️ skipped: file does not start with '%PDF'")
-        return None
+        return False
 
     # Write the PDF to disk
     with open(filepath, "wb") as f:
@@ -114,13 +131,13 @@ def download_pdf(pdf_url, dest_folder, filename_hint):
             f.write(chunk)
 
     print(f"    ✓ saved {filepath}")
-    return filepath
+    return True
 
 
 def main():
     # Customize your filters here
     industries = ["Industrials", "Forestry", "Financials"]
-    languages  = ["no", "nb", "nn", "sv"] #, "en"]  # include English
+    languages  = ["no", "nb", "nn", "sv"]  # include Swedish
     keyword    = "pdf"                       # only press releases linking PDFs
     page_size  = 30
 
@@ -139,9 +156,13 @@ def main():
             print("    ✗ no PDF links found.\n")
             continue
 
-        for idx, pdf in enumerate(pdfs, start=1):
+        for idx, pdf_url in enumerate(pdfs, start=1):
             hint = f"{os.path.basename(url)}_{idx}"
-            download_pdf(pdf, "gnw_pdfs", hint)
+            if file_exists("gnw_pdfs", hint):
+                print(f"    ⚠️ already exists: {get_filepath('gnw_pdfs', hint)}")
+                continue
+            filepath = get_filepath("gnw_pdfs", hint)
+            download_pdf(pdf_url, filepath)
         print()
 
 if __name__ == "__main__":
